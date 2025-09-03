@@ -1,0 +1,10 @@
+[package]
+name = "axum-web-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.99"
+axum = "0.8.4"
+llama-cpp-2 = "0.1.119"
+tokio = { version = "1.47.1", features = ["full"] }

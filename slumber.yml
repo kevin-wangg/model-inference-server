@@ -1,0 +1,43 @@
+# For basic usage info, see:
+# https://slumber.lucaspickering.me/getting_started.html
+# For all collection options, see:
+# https://slumber.lucaspickering.me/api/request_collection/index.html
+
+name: My Collection
+
+# Profiles are groups of data you can easily switch between. A common usage is
+# to define profiles for various environments of a REST service
+profiles:
+  example:
+    name: Example Profile
+    data:
+      host: https://httpbin.org
+  local:
+    name: Local Profile
+    data:
+      host: http://localhost
+      port: 3000
+
+# Chains allow you to use dynamic data in your request templates
+chains:
+  example:
+    source: !request
+      recipe: example1
+    selector: $.data
+
+requests:
+  hello_world: !request
+    name: Hello World
+    method: GET
+    url: "{{host}}:{{port}}/hello"
+  
+  increment: !request
+    name: Increment
+    method: POST
+    url: "{{host}}:{{port}}/increment"
+
+  count: !request
+    name: Get count
+    method: GET
+    url: "{{host}}:{{port}}/count"
+
