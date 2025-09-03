@@ -7,4 +7,5 @@ edition = "2024"
 anyhow = "1.0.99"
 axum = "0.8.4"
 llama-cpp-2 = "0.1.119"
+serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["full"] }
