@@ -1,5 +1,5 @@
-use std::cmp;
 use std::error;
+use std::num::NonZero;
 
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
@@ -7,7 +7,6 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, LlamaModel, Special};
 use llama_cpp_2::sampling::LlamaSampler;
-use llama_cpp_2::token::LlamaToken;
 
 pub struct QwenInferenceEngine {
     model: LlamaModel,
@@ -23,10 +22,18 @@ impl QwenInferenceEngine {
 
     pub fn generate(&self, prompt: &str) -> Result<String, Box<dyn error::Error>> {
         println!("prompt {}", prompt);
-        let context_params = LlamaContextParams::default();
+        let formatted_prompt = format!(
+            "
+            <|im_start|>user
+            {}<|im_end|>
+            <im_start|>assistant
+            ",
+            prompt
+        );
+        let context_params = LlamaContextParams::default().with_n_ctx(NonZero::new(4096));
         let mut context = self.model.new_context(&self.backend, context_params)?;
 
-        let tokens = self.model.str_to_token(prompt, AddBos::Always)?;
+        let tokens = self.model.str_to_token(&formatted_prompt, AddBos::Always)?;
 
         println!("tokens {:?}", tokens);
 
@@ -35,23 +42,18 @@ impl QwenInferenceEngine {
         context.decode(&mut batch)?;
 
         let mut generated_tokens = Vec::new();
-        let max_tokens = 500;
+        let max_tokens = 10000;
 
+        // Follows the recommended settings from https://docs.unsloth.ai/basics/qwen3-how-to-run-and-fine-tune/qwen3-2507#best-practices
         let mut sampler = LlamaSampler::chain_simple([
             LlamaSampler::top_k(20),      // Keep top 40 tokens
-            LlamaSampler::top_p(0.8, 1), // Nucleus sampling
+            LlamaSampler::top_p(0.8, 1),  // Nucleus sampling
             LlamaSampler::min_p(0.00, 1), // Min-p filtering
             LlamaSampler::temp(0.7),      // Apply temperature
-            LlamaSampler::dist(0),    // Final random selection with seed
+            LlamaSampler::dist(0),        // Final random selection with seed
         ]);
 
         for _ in 0..max_tokens {
-            // let candidates = context.candidates();
-            // let next_token = candidates
-            //     .into_iter()
-            //     .max_by(|a, b| a.p().partial_cmp(&b.p()).unwrap_or(cmp::Ordering::Equal))
-            //     .map(|candidate| candidate.id())
-            //     .unwrap_or(LlamaToken::new(0));
             let next_token = sampler.sample(&context, -1);
 
             if self.model.is_eog_token(next_token) {
@@ -66,7 +68,6 @@ impl QwenInferenceEngine {
                 &[0],
                 true,
             )?;
-            // batch.add_sequence(&generated_tokens, 0, true)?;
             context.decode(&mut batch)?;
         }
 
