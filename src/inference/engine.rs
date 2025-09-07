@@ -8,6 +8,8 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, LlamaModel, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 
+const MAX_TOKENS: i32 = 10000;
+
 pub struct QwenInferenceEngine {
     model: LlamaModel,
     backend: LlamaBackend,
@@ -21,7 +23,6 @@ impl QwenInferenceEngine {
     }
 
     pub fn generate(&self, prompt: &str) -> Result<String, Box<dyn error::Error>> {
-        println!("prompt {}", prompt);
         let formatted_prompt = format!(
             "
             <|im_start|>user
@@ -35,14 +36,11 @@ impl QwenInferenceEngine {
 
         let tokens = self.model.str_to_token(&formatted_prompt, AddBos::Always)?;
 
-        println!("tokens {:?}", tokens);
-
         let mut batch = LlamaBatch::new(tokens.len() + 256, 1);
         batch.add_sequence(&tokens, 0, true)?;
         context.decode(&mut batch)?;
 
         let mut generated_tokens = Vec::new();
-        let max_tokens = 10000;
 
         // Follows the recommended settings from https://docs.unsloth.ai/basics/qwen3-how-to-run-and-fine-tune/qwen3-2507#best-practices
         let mut sampler = LlamaSampler::chain_simple([
@@ -53,10 +51,11 @@ impl QwenInferenceEngine {
             LlamaSampler::dist(0),        // Final random selection with seed
         ]);
 
-        for _ in 0..max_tokens {
+        for _ in 0..MAX_TOKENS {
             let next_token = sampler.sample(&context, -1);
 
             if self.model.is_eog_token(next_token) {
+                println!("EOG token encountered");
                 break;
             }
 
@@ -70,8 +69,6 @@ impl QwenInferenceEngine {
             )?;
             context.decode(&mut batch)?;
         }
-
-        println!("generated tokens {:?}", generated_tokens);
 
         let generated_text = self
             .model
